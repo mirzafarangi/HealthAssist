@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-This project represents a comprehensive Heart Rate Variability (HRV) analysis platform designed for continuous cardiovascular metrics monitoring and analysis. The system collects, processes, and visualizes HRV data from a Polar H10 heart rate sensor, providing scientific-grade insights into autonomic nervous system function and recovery dynamics.
+This project represents a Heart Rate Variability (HRV) analysis platform designed for continuous cardiovascular metrics monitoring and analysis. The system collects, processes, and visualizes HRV data from a Polar H10 heart rate sensor, providing scientific-grade insights into autonomic nervous system function and recovery dynamics.
 
 Unlike commercial platforms that obscure their algorithms and interpretation methods, this project implements an open, customizable approach to HRV analysis—providing complete transparency while maintaining clinical validity. The system is built on established physiological principles while incorporating modern data science methods for validation and interpretation.
 
 The platform consists of three integrated components:
 
 1. **iOS App (PolarHRVApp)**: A custom-built application that connects directly to the Polar H10 sensor, recording raw RR intervals and implementing configurable data collection protocols
-2. **Backend API (hrv-api)**: A robust processing engine that validates signal integrity, calculates comprehensive HRV metrics, and applies physiological interpretation models
+2. **Backend API (hrv-api)**: A robust processing engine that validates signal integrity, calculates different HRV metrics, and applies physiological interpretation models
 3. **HealthAssist Dashboard**: A data visualization platform that presents metrics with context-aware insights, trend analysis, and predictive modeling
 
 <details>
@@ -122,7 +122,7 @@ The API represents the analytical core of the platform, applying rigorous valida
 
 #### 1. Signal Validation & Quality Assessment
 
-To ensure scientific validity, the system applies a comprehensive validation protocol:
+To ensure scientific validity, the system applies a variety validation protocols:
 
 ##### RR Interval Range Filtering
 - **Acceptable Range**: 300-2000ms
@@ -161,7 +161,7 @@ Quality assessment categories:
 
 #### 2. HRV Metrics Calculation
 
-Once data is validated, the system calculates a comprehensive set of metrics:
+Once data is validated, the system calculates the following essential metrics:
 
 ##### Time-Domain Metrics
 
@@ -250,7 +250,7 @@ API responses are structured to include:
 - Calculated metrics (time-domain, frequency-domain)
 - Interpretation groupings with contextual insights
 
-This comprehensive processing ensures scientifically valid HRV analysis with appropriate physiological context.
+This processing ensures scientifically valid HRV analysis with appropriate physiological context.
 
 </details>
 
@@ -259,7 +259,7 @@ This comprehensive processing ensures scientifically valid HRV analysis with app
 
 ### Dashboard Architecture
 
-The HealthAssist Dashboard provides a comprehensive visualization and analysis platform for interpreting HRV data. It's designed as a modular system with the cardiovascular metrics module currently implemented and additional health domains planned for future integration.
+The HealthAssist Dashboard provides a visualization and analysis platform for interpreting HRV data. It's designed as a modular system with the cardiovascular metrics module currently implemented and additional health domains planned for future integration.
 
 #### Modular Design
 
