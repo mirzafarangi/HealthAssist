@@ -1,6 +1,6 @@
 # HRV Metrics Analysis Platform
 
-## 📖 Project Overview
+## Project Overview
 
 This project represents a comprehensive Heart Rate Variability (HRV) analysis platform designed for continuous cardiovascular metrics monitoring and analysis. The system collects, processes, and visualizes HRV data from a Polar H10 heart rate sensor, providing scientific-grade insights into autonomic nervous system function and recovery dynamics.
 
@@ -13,7 +13,7 @@ The platform consists of three integrated components:
 3. **HealthAssist Dashboard**: A data visualization platform that presents metrics with context-aware insights, trend analysis, and predictive modeling
 
 <details>
-<summary><h2>📱 iOS App Architecture</h2></summary>
+<summary><h2>iOS App Architecture</h2></summary>
 
 ### Core Functionality
 
@@ -114,7 +114,7 @@ This architecture ensures reliable, context-aware data collection while maintain
 </details>
 
 <details>
-<summary><h2>🧠 HRV API & Processing Engine</h2></summary>
+<summary><h2>HRV API & Processing Engine</h2></summary>
 
 ### Data Processing Pipeline
 
@@ -255,7 +255,7 @@ This comprehensive processing ensures scientifically valid HRV analysis with app
 </details>
 
 <details>
-<summary><h2>📊 HealthAssist Dashboard</h2></summary>
+<summary><h2>HealthAssist Dashboard</h2></summary>
 
 ### Dashboard Architecture
 
@@ -478,7 +478,7 @@ These analytical features transform raw HRV data into meaningful health insights
 </details>
 
 <details>
-<summary><h2>📏 Device & Platform Comparisons</h2></summary>
+<summary><h2>Device & Platform Comparisons</h2></summary>
 
 ### Comparative Analysis with Commercial Platforms
 
@@ -532,7 +532,7 @@ This project bridges the gap between consumer-grade HRV monitors with black-box 
 </details>
 
 <details>
-<summary><h2>🔬 Scientific Foundations & Research Context</h2></summary>
+<summary><h2>Scientific Foundations & Research Context</h2></summary>
 
 ### Heart Rate Variability Science
 
@@ -602,7 +602,7 @@ This project strives to maintain alignment with current scientific understanding
 </details>
 
 <details>
-<summary><h2>🛠️ Technical Implementation</h2></summary>
+<summary><h2>Technical Implementation</h2></summary>
 
 ### Project Structure & Implementation Details
 
@@ -657,369 +657,3 @@ The API is built with Python using FastAPI framework and SQLAlchemy ORM:
 │   │   └── sql_models.py         # SQLAlchemy database models
 │   └── constants
 │       └── interpretations.py    # Metric interpretation constants
-```
-
-The API implements several advanced features:
-
-1. **Asynchronous Processing**: FastAPI's async capabilities enable high throughput for concurrent requests
-2. **Pydantic Validation**: All incoming data is validated against strict schemas
-3. **Database Migrations**: Alembic manages schema changes and version control
-4. **Error Handling**: Comprehensive error states with informative messages
-5. **Scientific Computing**: NumPy and SciPy for HRV calculations
-
-Key API endpoints:
-
-- `POST /api/hrv/session`: Submit new recording session data
-- `GET /api/hrv/sessions/user/{user_id}`: Get all sessions for a user
-- `GET /api/hrv/sessions/tag/{tag}`: Get sessions with specific tag
-- `GET /api/hrv/session/{session_id}`: Get detailed metrics for specific session
-
-#### Dashboard Implementation
-
-The dashboard is built with Python using Streamlit for interactive web components:
-
-```
-├── Dash_Project
-│   ├── hrv
-│   │   ├── record_summary.py    # Session overview visualization
-│   │   ├── index_1.py           # Daily analytics dashboard
-│   │   ├── index_2.py           # Trend analysis visualization
-│   │   └── delete_session.py    # Data management tools
-│   └── main_dash.py             # Dashboard entry point
-```
-
-The dashboard leverages several data visualization libraries:
-
-1. **Plotly**: Interactive charts and visualizations
-2. **Pandas**: Data manipulation and transformation
-3. **NumPy**: Numerical computations
-4. **SQLAlchemy**: Database connectivity
-
-Technical highlights of the dashboard:
-
-- **Dynamic Content Loading**: Modular components loaded based on user navigation
-- **Responsive Design**: Adapts to different screen sizes
-- **Interactive Filtering**: Real-time data filtering and exploration
-- **State Management**: Preserves analysis state between interactions
-- **Timezone Handling**: Proper Berlin timezone localization for timestamps
-
-### Database Schema
-
-The PostgreSQL database implements a normalized schema to efficiently store and retrieve HRV data:
-
-```
-Tables:
-┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-│ users           │       │ hrv_sessions    │       │ hrv_metrics     │
-├─────────────────┤       ├─────────────────┤       ├─────────────────┤
-│ id              │       │ id              │       │ id              │
-│ email           │◄──────┤ user_id         │◄──────┤ session_id      │
-│ created_at      │       │ timestamp       │       │ mean_rr         │
-└─────────────────┘       │ recording_id    │       │ sdnn            │
-                          │ heart_rate      │       │ rmssd           │
-                          │ valid           │       │ pnn50           │
-                          │ quality_score   │       │ cv_rr           │
-                          └─────────────────┘       │ rr_count        │
-                                  ▲                 │ lf_power        │
-                                  │                 │ hf_power        │
-                          ┌───────┴───────┐         │ lf_hf_ratio     │
-                          │ session_tags  │         │ breathing_rate  │
-                          ├─────────────────┤       └─────────────────┘
-                          │ session_id     │               ▲
-                          │ tag_id         │               │
-                          └─────────────────┘       ┌───────┴───────┐
-                                  ▲                 │ rr_intervals  │
-                                  │                 ├─────────────────┤
-                          ┌───────┴───────┐         │ id              │
-                          │ tags          │         │ session_id      │
-                          ├─────────────────┤       │ interval_index  │
-                          │ id              │       │ rr_value        │
-                          │ name            │       │ is_valid        │
-                          └─────────────────┘       └─────────────────┘
-```
-
-Key database features:
-
-1. **Foreign Key Constraints**: Maintain data integrity
-2. **Indexing Strategy**: Optimized for common query patterns
-3. **JSON Storage**: Complex data stored in JSON columns when appropriate
-4. **Transactions**: Ensures data consistency
-
-### Deployment Architecture
-
-The system is deployed using a modern cloud architecture:
-
-```
-                                   ┌───────────────────┐
-                         ┌────────►│ PostgreSQL        │
-                         │         │ Database          │
-┌───────────────┐        │         └───────────────────┘
-│               │        │                  ▲
-│  iOS App      │────────┤                  │
-│               │        │         ┌───────────────────┐
-└───────────────┘        │         │ FastAPI Backend   │
-                         └────────►│ (Render)          │
-                                   └───────────────────┘
-                                             ▲
-                                             │
-                                   ┌───────────────────┐
-                                   │ Streamlit         │
-                                   │ Dashboard         │
-                                   └───────────────────┘
-```
-
-Components are deployed on Render with:
-
-1. **Continuous Deployment**: Automatic deployment from GitHub
-2. **Environment Variables**: Secure configuration management
-3. **Health Checks**: Monitoring of service availability
-4. **Database Backups**: Automated PostgreSQL backups
-
-</details>
-
-<details>
-<summary><h2>🚀 Getting Started</h2></summary>
-
-### Prerequisites
-
-To set up and run this project, you will need:
-
-- macOS for iOS app development
-- Xcode 14+ with Swift 5.5+
-- iOS device with Bluetooth 4.0+ for testing
-- Polar H10 heart rate sensor
-- Python 3.10+ for API and Dashboard
-- PostgreSQL 13+
-
-### iOS App Setup
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/hrv-analysis-platform.git
-   cd hrv-analysis-platform/PolarHRVAPP
-   ```
-
-2. Open the Xcode project:
-   ```bash
-   open PolarHRVApp/PolarHRVApp.xcodeproj
-   ```
-
-3. Update the API endpoint in `APIService.swift` if needed:
-   ```swift
-   private let baseURL = "https://your-api-url.com/api"
-   ```
-
-4. Build and run on your iOS device (simulator will not work due to Bluetooth requirements)
-
-### API Setup
-
-1. Set up a Python virtual environment:
-   ```bash
-   cd hrv-api
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Create a `.env` file with your database configuration:
-   ```
-   DATABASE_URL=<your own URL>
-   API_HOST=0.0.0.0
-   API_PORT=8000
-   ```
-
-4. Run database migrations:
-   ```bash
-   alembic upgrade head
-   ```
-
-5. Start the API:
-   ```bash
-   uvicorn main:app --reload
-   ```
-
-### Dashboard Setup
-
-1. Create another Python virtual environment:
-   ```bash
-   cd Dash_Project
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Configure database connection in `main_dash.py`:
-   ```python
-   DATABASE_URL = "<Your Own DB_URL>"
-   ```
-
-4. Start the dashboard:
-   ```bash
-   streamlit run main_dash.py
-   ```
-
-### Deploying to Render
-
-1. Fork this repository to your GitHub account
-
-2. Create a new Web Service on Render pointing to your fork
-
-3. Configure the build settings:
-   - Build Command: `./build.sh`
-   - Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-
-4. Add environment variables for database connection
-
-5. Create a separate Web Service for the dashboard:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `streamlit run main_dash.py --server.port $PORT --server.address 0.0.0.0`
-
-6. Create a PostgreSQL database service and link it to both applications
-
-</details>
-
-<details>
-<summary><h2>🔮 Future Directions</h2></summary>
-
-The current implementation focuses on cardiovascular metrics through HRV analysis, but the platform is designed to be extensible. Future planned expansions include:
-
-### Additional Biometric Integrations
-
-1. **Continuous Glucose Monitoring (CGM)**
-   - Integration with Libre and Dexcom APIs
-   - Glucose variability analysis
-   - Metabolic response patterns
-   - HRV-glucose correlation analysis
-
-2. **Sleep Metrics Enhancement**
-   - Integration with Oura Ring API
-   - EEG-based sleep staging (with compatible hardware)
-   - Sleep architecture optimization
-   - Circadian alignment assessment
-
-3. **Blood Biomarker Integration**
-   - API connections to blood testing services
-   - Inflammatory marker tracking
-   - Hormone balance monitoring
-   - Metabolic health indicators
-
-### Advanced Analysis Techniques
-
-1. **Machine Learning Models**
-   - Personalized anomaly detection
-   - Predictive health indicators
-   - Pattern recognition across metrics
-   - Individualized recovery algorithms
-
-2. **Longitudinal Health Modeling**
-   - Long-term trend visualization
-   - Intervention impact assessment
-   - Lifestyle correlation analysis
-   - Health trajectory forecasting
-
-3. **Comprehensive Health Scoring**
-   - Integration of multiple health domains
-   - Weighted component scoring
-   - Personalized reference ranges
-   - Contextual interpretation framework
-
-### Platform Enhancements
-
-1. **Mobile Dashboard App**
-   - Native iOS companion app for dashboard access
-   - Push notifications for insights
-   - Widget integration for quick metrics
-
-2. **Enhanced Data Sharing**
-   - Practitioner sharing module
-   - Research export capabilities
-   - Anonymous aggregated insights
-   - Team/group analytics
-
-3. **Intervention Testing Framework**
-   - Structured protocol builder
-   - A/B testing of lifestyle interventions
-   - Statistical analysis of intervention effects
-   - Personalized optimization algorithms
-
-The roadmap envisions transforming this platform from a focused HRV analysis system into a comprehensive health optimization platform, while maintaining the core principles of transparency, scientific validity, and user empowerment.
-
-</details>
-
-<details>
-<summary><h2>📚 Resources & References</h2></summary>
-
-### Educational Resources
-
-For those interested in learning more about HRV analysis and interpretation:
-
-1. **HRV Basics**
-   - [HeartMath Institute: Science of the Heart](https://www.heartmath.org/research/science-of-the-heart/)
-   - [Foundations of Heart Rate Variability Analysis](https://www.frontiersin.org/articles/10.3389/fpubh.2017.00258/full)
-
-2. **Technical References**
-   - [Task Force Guidelines for HRV Measurement](https://www.ahajournals.org/doi/full/10.1161/01.CIR.93.5.1043)
-   - [Kubios HRV Analysis Methods](https://www.kubios.com/hrv-analysis-methods/)
-
-3. **Research Applications**
-   - [HRV and Autonomic Function in Various Physiological Conditions](https://physoc.onlinelibrary.wiley.com/doi/10.1113/EP087885)
-   - [HRV in Sports and Exercise](https://journals.lww.com/acsm-msse/Fulltext/2018/07000/Heart_Rate_Variability_Monitoring_in_Sport__A.26.aspx)
-
-### Scientific References
-
-Key research papers informing this project:
-
-1. Shaffer, F., & Ginsberg, J. P. (2017). An overview of heart rate variability metrics and norms. Frontiers in public health, 5, 258.
-
-2. Buchheit, M. (2014). Monitoring training status with HR measures: do all roads lead to Rome? Frontiers in physiology, 5, 73.
-
-3. Malik, M., Bigger, J. T., Camm, A. J., Kleiger, R. E., Malliani, A., Moss, A. J., & Schwartz, P. J. (1996). Heart rate variability: Standards of measurement, physiological interpretation, and clinical use. European heart journal, 17(3), 354-381.
-
-4. Plews, D. J., Laursen, P. B., Stanley, J., Kilding, A. E., & Buchheit, M. (2013). Training adaptation and heart rate variability in elite endurance athletes: opening the door to effective monitoring. Sports medicine, 43(9), 773-781.
-
-5. Thayer, J. F., Åhs, F., Fredrikson, M., Sollers III, J. J., & Wager, T. D. (2012). A meta-analysis of heart rate variability and neuroimaging studies: implications for heart rate variability as a marker of stress and health. Neuroscience & Biobehavioral Reviews, 36(2), 747-756.
-
-### Tools & Libraries
-
-This project builds upon several open-source tools and libraries:
-
-1. **HRV Analysis**
-   - [hrv-analysis](https://github.com/Aura-healthcare/hrv-analysis)
-   - [pyHRV](https://github.com/PGomes92/pyhrv)
-   - [SciPy Signal Processing](https://docs.scipy.org/doc/scipy/reference/signal.html)
-
-2. **Visualization**
-   - [Plotly](https://plotly.com/python/)
-   - [Streamlit](https://streamlit.io/)
-   - [Pandas](https://pandas.pydata.org/)
-
-3. **Infrastructure**
-   - [FastAPI](https://fastapi.tiangolo.com/)
-   - [SQLAlchemy](https://www.sqlalchemy.org/)
-   - [Alembic](https://alembic.sqlalchemy.org/)
-
-</details>
-
-## ⚖️ License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-This project builds upon established research in the field of heart rate variability analysis and autonomic nervous system assessment. Special thanks to:
-
-- The Task Force of The European Society of Cardiology and The North American Society of Pacing and Electrophysiology for their standards of HRV measurement
-- Researchers and developers who have contributed to open-source HRV analysis tools
-- The Polar team for creating accessible tools for HRV data collection
-
----
-
-*This project is not intended for medical diagnosis or treatment. Always consult healthcare professionals for medical advice.*
