@@ -604,6 +604,7 @@ This project strives to maintain alignment with current scientific understanding
 <details>
 <summary><h2>Technical Implementation</h2></summary>
 
+
 ### Project Structure & Implementation Details
 
 The project is organized into three main components with specific technical implementations:
@@ -659,5 +660,6 @@ The API is built with Python using FastAPI framework and SQLAlchemy ORM:
 │       └── interpretations.py    # Metric interpretation constants
 ```
 
-#### Contact
+<details>
+<summary><h2>Contact</h2></summary>
 Created by - Atriom Circle, Applied Intelligence Practice - For questions or support, please contact: [a.beheshti@posteo.de](mailto:a.beheshti@posteo.de)
