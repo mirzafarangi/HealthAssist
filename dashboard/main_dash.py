@@ -5,7 +5,7 @@ import sys
 
 # Set page configuration
 st.set_page_config(
-    page_title="HealthAssist Dashboard",
+    page_title="Personal Health Assist",
     page_icon="⚕️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -59,7 +59,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Title and description
-st.title("HealthAssist Dashboard")
+st.title("Personal Health Assist")
 st.markdown("---")
 
 # Sidebar
@@ -69,7 +69,9 @@ st.sidebar.markdown("---")
 # Metric categories definition
 metric_categories = [
     {"name": "Cardiovascular Metrics", "folder": "hrv"},
-    {"name": "Metric Category 2", "folder": "metric2"},
+    {"name": "Sleep Architecture", "folder": "metric2"},
+    {"name": "Continuous Glucose Monitoring", "folder": "metric3"},
+    {"name": "Gut Microbiome", "folder": "metric4"},
     # Add more metric categories here as needed
 ]
 

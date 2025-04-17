@@ -14,7 +14,7 @@ import pytz
 def get_db_engine():
     """Create and return a database engine."""
     try:
-        DATABASE_URL = "your db url here"
+        DATABASE_URL = "postgresql://ashkan:qQdSL2BnknLZ3JUn8fcJCZ49fY6aRyKn@dpg-cvhtllqqgecs73d4r9a0-a.frankfurt-postgres.render.com/hrv_records_db"
         engine = create_engine(DATABASE_URL)
         # Test connection
         with engine.connect() as conn:
