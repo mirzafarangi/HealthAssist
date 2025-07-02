@@ -1,4 +1,4 @@
-// RecordingManager.swift
+// Managers/RecordingManager.swift
 
 import Foundation
 import Combine
@@ -7,445 +7,142 @@ import os.log
 class RecordingManager: ObservableObject {
     private let logger = Logger(subsystem: "com.hrvmetrics.polarh10", category: "RecordingManager")
     private var cancellables = Set<AnyCancellable>()
-    private let userManager: UserManager
     private let bluetoothManager: BluetoothManager
+    private let firebaseService: FirebaseService
     
-    // Session settings
-    @Published var intervalBetweenRecordings: Int = 2 // N: minutes between recordings (default: 2 minutes)
-    @Published var recordingDuration: Int = 3 // M: minutes per recording (default: 3 minutes)
-    @Published var selectedTag: String = "Active" // Default tag
-    
-    // Available tags as per API requirements
-    let availableTags = [
-        "Sleep", "Rest", "Active", "Engaged", "Experiment"
-    ]
+    // Recording settings
+    @Published var selectedTag: RecordingTag = .rest
+    @Published var recordingDuration: Int = 7 // M: minutes per recording (1-7)
+    @Published var durationWarning: String?
+    @Published var pairedSessionId: String? // For pre/post pairing
     
     // Recording state
     @Published var isRecording: Bool = false
-    @Published var isAutoRecording: Bool = false
-    @Published var recordingSecondsLeft: Int = 0
-    @Published var timeUntilNextRecording: Int = 0
+    @Published var recordingSecondsElapsed: Int = 0
     @Published var recordingMessage: String = ""
-    @Published var errorMessage: String? = nil
+    @Published var errorMessage: String?
     @Published var sessionCount: Int = 0
-    @Published var isRefreshingCount: Bool = false
+    @Published var isLoading: Bool = false
     
-    // Recovery and buffer features
-    @Published var isRecoveryMode: Bool = false
-    @Published var bufferedSessionCount: Int = 0
-    private var reconnectionTimer: Timer?
-    private var syncTimer: Timer?
-    private var lastActiveTag: String = "Active" // Store the last used tag
-    
-    // Timers
-    private var recordingTimer: Timer?
-    private var autoRecordingTimer: Timer?
-    private var intervalTimer: Timer?
-    
-    // Current RR intervals collection
+    // Current recording data
     private var currentRRIntervals: [Int] = []
+    private var recordingTimer: Timer?
+    private var recordingStartTime: Date?
     
-    init(userManager: UserManager, bluetoothManager: BluetoothManager) {
-        self.userManager = userManager
+    init(bluetoothManager: BluetoothManager, firebaseService: FirebaseService) {
         self.bluetoothManager = bluetoothManager
+        self.firebaseService = firebaseService
         
         // Fetch session count on initialization
         fetchSessionCount()
         
-        // Setup observation for Bluetooth events
-        setupNotificationObservers()
-        
-        // Check for buffered sessions
-        updateBufferedSessionCount()
-        
-        // Start a periodic sync timer
-        startSyncTimer()
-    }
-    
-    // MARK: - Notification Observers
-    
-    private func setupNotificationObservers() {
-        // Register for Bluetooth disconnection notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleBluetoothDisconnection),
-            name: .bluetoothDisconnected,
-            object: nil
-        )
-        
-        // Register for Bluetooth reconnection notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleBluetoothReconnection),
-            name: .bluetoothReconnected,
-            object: nil
-        )
-        
-        // Register for Bluetooth reconnection failure notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleReconnectFailure),
-            name: .bluetoothReconnectFailed,
-            object: nil
-        )
-        
-        // Register for data buffer ready notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleDataBufferReady),
-            name: .dataBufferReady,
-            object: nil
-        )
-    }
-    
-    @objc private func handleBluetoothDisconnection() {
-        logger.warning("Bluetooth disconnected while recording active: \(self.isRecording || self.isAutoRecording)")
-        
-        // If we were recording, we need to take action
-        if isRecording || isAutoRecording {
-            // Save the last active tag
-            lastActiveTag = selectedTag
-            
-            // If in middle of recording, save what we have
-            if isRecording && !currentRRIntervals.isEmpty {
-                logger.info("Saving partial recording data before disconnect")
-                finishRecording(saveToBuffer: true)
+        // Monitor tag changes to update duration
+        $selectedTag
+            .sink { [weak self] tag in
+                self?.recordingDuration = tag.defaultDuration == -1 ? 7 : tag.defaultDuration
+                self?.durationWarning = nil
             }
-            
-            // Enter recovery mode
-            isRecoveryMode = true
-            recordingMessage = "Connection lost. Attempting to recover..."
-            
-            // Enable auto reconnect
-            bluetoothManager.enableAutoReconnect()
-            
-            // Start recovery timer that periodically checks if we're reconnected
-            startReconnectionTimer()
-        }
-    }
-    
-    @objc private func handleBluetoothReconnection() {
-        // If we're in recovery mode, resume recording
-        if isRecoveryMode {
-            logger.info("Bluetooth reconnected while in recovery mode")
-            handleReconnectionSuccess()
-        }
-    }
-    
-    @objc private func handleReconnectFailure() {
-        logger.warning("Bluetooth reconnection failed after multiple attempts")
-        
-        if isRecoveryMode {
-            isRecoveryMode = false
-            stopAutoRecording()
-            recordingMessage = "Connection recovery failed. Recording stopped."
-            errorMessage = "Unable to reconnect to Polar H10. Please check the device and try again."
-        }
-    }
-    
-    @objc private func handleDataBufferReady() {
-        updateBufferedSessionCount()
-        
-        // If we're connected to the internet, try to sync immediately
-        if isNetworkReachable() {
-            syncBufferedSessions()
-        }
-    }
-    
-    // MARK: - Recovery Methods
-    
-    private func startReconnectionTimer() {
-        reconnectionTimer?.invalidate()
-        
-        reconnectionTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
-            guard let self = self, self.isRecoveryMode else { return }
-            
-            // Check if we've reconnected
-            if self.bluetoothManager.connectionState == .connected {
-                self.logger.info("Reconnected to device, resuming recording")
-                self.handleReconnectionSuccess()
-            }
-        }
-        
-        if let timer = reconnectionTimer {
-            RunLoop.current.add(timer, forMode: .common)
-        }
-    }
-    
-    private func stopReconnectionTimer() {
-        reconnectionTimer?.invalidate()
-        reconnectionTimer = nil
-    }
-    
-    private func handleReconnectionSuccess() {
-        // Stop the recovery mode
-        isRecoveryMode = false
-        stopReconnectionTimer()
-        
-        // If we were auto-recording, restart it with the last tag
-        if isAutoRecording {
-            selectedTag = lastActiveTag
-            recordingMessage = "Connection restored. Resuming auto-recording with tag: \(selectedTag)"
-            
-            // Small delay to ensure services are discovered
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                guard let self = self else { return }
-                self.startNextAutoRecordingSession()
-            }
-        } else {
-            recordingMessage = "Connection restored. Ready to record."
-        }
-    }
-    
-    // MARK: - Buffer Management
-    
-    private func startSyncTimer() {
-        syncTimer?.invalidate()
-        
-        // Try to sync buffered data every 5 minutes
-        syncTimer = Timer.scheduledTimer(withTimeInterval: 300.0, repeats: true) { [weak self] _ in
-            self?.syncBufferedSessions()
-        }
-        
-        if let timer = syncTimer {
-            RunLoop.current.add(timer, forMode: .common)
-        }
-    }
-    
-    private func updateBufferedSessionCount() {
-        bufferedSessionCount = DataBufferService.shared.getBufferedSessionCount()
-    }
-    
-    private func saveRecordingToBuffer() {
-        // Ensure we have the necessary data
-        guard userManager.isLoggedIn && !currentRRIntervals.isEmpty else {
-            errorMessage = "Cannot save recording: missing data"
-            return
-        }
-        
-        // Create a unique session ID with timestamp
-        let sessionId = "session_\(Int(Date().timeIntervalSince1970))"
-        
-        // Sanitize device info to prevent NUL byte issues
-        let firmwareVersion = bluetoothManager.deviceInfo.firmwareRevision.replacingOccurrences(of: "\0", with: "")
-        let modelName = bluetoothManager.deviceInfo.model.replacingOccurrences(of: "\0", with: "")
-        
-        // Create request data
-        let recordingData = HRVRecordingData(
-            user_id: userManager.email,
-            device_info: HRVRecordingData.DeviceInfo(
-                model: modelName,
-                firmwareVersion: firmwareVersion
-            ),
-            recordingSessionId: sessionId,
-            timestamp: ISO8601DateFormatter().string(from: Date()),
-            rrIntervals: self.currentRRIntervals,
-            heartRate: bluetoothManager.heartRate,
-            motionArtifacts: false,
-            tags: [selectedTag]
-        )
-        
-        // Buffer the session data
-        DataBufferService.shared.bufferSession(recordingData: recordingData)
-        
-        // Update the UI
-        updateBufferedSessionCount()
-        recordingMessage = "Recording saved to local buffer"
-        logger.info("Recording saved to local buffer: \(sessionId)")
-    }
-    
-    // MARK: - Network Connectivity
-    
-    private func isNetworkReachable() -> Bool {
-        // A simple check - in a real app you might want to use a more robust network check
-        let url = URL(string: "https://www.apple.com")!
-        var success = false
-        let semaphore = DispatchSemaphore(value: 0)
-        
-        let task = URLSession.shared.dataTask(with: url) { _, response, _ in
-            if let httpResponse = response as? HTTPURLResponse,
-               (200...299).contains(httpResponse.statusCode) {
-                success = true
-            }
-            semaphore.signal()
-        }
-        
-        task.resume()
-        _ = semaphore.wait(timeout: .now() + 5.0)
-        
-        return success
+            .store(in: &cancellables)
     }
     
     // MARK: - Public Methods
     
-    // Start a single recording session
-    func startSingleRecording() {
+    func startRecording() {
+        // Validate prerequisites
         guard validateRecordingPrerequisites() else { return }
         
-        // Calculate duration in seconds
-        let durationInSeconds = recordingDuration * 60
-        
-        // Initialize recording
-        isRecording = true
-        recordingSecondsLeft = durationInSeconds
-        recordingMessage = "Recording: \(formatTimeRemaining(recordingSecondsLeft))"
-        errorMessage = nil
-        
-        // Clear any previous RR intervals before starting
-        bluetoothManager.rrIntervals = []
-        currentRRIntervals = []
-        
-        // Start the recording timer
-        recordingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
+        // Validate duration for non-sleep tags
+        if selectedTag.allowsCustomDuration {
+            if recordingDuration < 1 || recordingDuration > 7 {
+                errorMessage = "Duration must be between 1 and 7 minutes"
+                return
+            }
             
-            if self.recordingSecondsLeft > 0 {
-                self.recordingSecondsLeft -= 1
-                self.recordingMessage = "Recording: \(self.formatTimeRemaining(self.recordingSecondsLeft))"
-            } else {
-                // Capture the collected RR intervals
-                self.currentRRIntervals = self.bluetoothManager.rrIntervals
-                
-                // Finish the recording
-                self.finishRecording()
+            if recordingDuration < 7 {
+                durationWarning = "Recording for less than 7 minutes may affect analysis quality"
             }
         }
         
-        // Ensure the timer works in background
-        if let timer = recordingTimer {
-            RunLoop.current.add(timer, forMode: .common)
+        // Initialize recording
+        isRecording = true
+        recordingSecondsElapsed = 0
+        recordingStartTime = Date()
+        errorMessage = nil
+        currentRRIntervals = []
+        
+        // Clear previous RR intervals
+        bluetoothManager.rrIntervals = []
+        
+        // Update message based on tag
+        if selectedTag == .sleep {
+            recordingMessage = "Recording sleep session... Tap 'Stop' when you wake up"
+        } else {
+            let totalSeconds = recordingDuration * 60
+            recordingMessage = "Recording: \(formatTime(totalSeconds - recordingSecondsElapsed)) remaining"
+        }
+        
+        // Start recording timer
+        startRecordingTimer()
+        
+        // Enable background task for sleep recording
+        if selectedTag == .sleep {
+            BackgroundTaskManager.shared.beginBackgroundTask(withName: "SleepRecording")
+        }
+        
+        logger.info("Started recording with tag: \(self.selectedTag.rawValue), duration: \(self.recordingDuration) minutes")
+    }
+    
+    func stopRecording() {
+        guard isRecording else { return }
+        
+        // For sleep tag or manual stop
+        if selectedTag == .sleep || recordingSecondsElapsed > 0 {
+            finishRecording()
         }
     }
     
-    // Cancel the current recording
     func cancelRecording() {
+        guard isRecording else { return }
+        
         recordingTimer?.invalidate()
         recordingTimer = nil
         
         isRecording = false
         recordingMessage = "Recording cancelled"
-        recordingSecondsLeft = 0
+        recordingSecondsElapsed = 0
         currentRRIntervals = []
-    }
-    
-    // Start automatic recording
-    func startAutoRecording() {
-        guard validateRecordingPrerequisites() else { return }
         
-        // Validate interval and duration settings
-        guard intervalBetweenRecordings >= 2 && intervalBetweenRecordings <= 10 else {
-            errorMessage = "Interval (N) must be between 2 and 10 minutes"
-            return
+        // End background task if active
+        if selectedTag == .sleep {
+            BackgroundTaskManager.shared.endBackgroundTask()
         }
         
-        guard recordingDuration >= 3 && recordingDuration <= 5 else {
-            errorMessage = "Duration (M) must be between 3 and 5 minutes"
-            return
-        }
-        
-        // Save the active tag
-        lastActiveTag = selectedTag
-        
-        isAutoRecording = true
-        errorMessage = nil
-        recordingMessage = "Auto-recording will begin in 5 seconds"
-        
-        // Enable auto-reconnect for Bluetooth
-        bluetoothManager.enableAutoReconnect()
-        
-        // Register with background task manager to keep recording in background
-        BackgroundTaskManager.shared.beginBackgroundTask(withName: "HRVAutoRecording")
-        
-        // Start the first recording after a brief delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-            guard let self = self, self.isAutoRecording else { return }
-            self.startNextAutoRecordingSession()
-        }
+        logger.info("Recording cancelled by user")
     }
     
-    // Stop automatic recording
-    func stopAutoRecording() {
-        recordingTimer?.invalidate()
-        recordingTimer = nil
-        
-        autoRecordingTimer?.invalidate()
-        autoRecordingTimer = nil
-        
-        intervalTimer?.invalidate()
-        intervalTimer = nil
-        
-        isAutoRecording = false
-        isRecording = false
-        isRecoveryMode = false
-        recordingMessage = "Auto-recording stopped"
-        
-        // Disable auto-reconnect for Bluetooth
-        bluetoothManager.disableAutoReconnect()
-        
-        // End background task
-        BackgroundTaskManager.shared.endBackgroundTask()
-        
-        // Try to sync any buffered sessions
-        syncBufferedSessions()
-    }
-    
-    // Sync buffered sessions to the server
-    func syncBufferedSessions() {
-        let bufferedSessions = DataBufferService.shared.fetchBufferedSessions()
-        
-        guard !bufferedSessions.isEmpty else { return }
-        
-        logger.info("Attempting to sync \(bufferedSessions.count) buffered sessions")
-        
-        // Try to sync the first session
-        syncNextBufferedSession(index: 0)
-    }
-    
-    // Fetch the current session count for the user
     func fetchSessionCount() {
-        guard userManager.isLoggedIn else {
-            sessionCount = 0
-            return
-        }
-        
-        print("Fetching session count for user: \(userManager.email)")
-        isRefreshingCount = true
-        
-        APIService.shared.getSessionCount(userId: userManager.email)
+        firebaseService.fetchSessionCount()
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { [weak self] completion in
-                    self?.isRefreshingCount = false
                     if case .failure(let error) = completion {
-                        self?.logger.error("Failed to fetch session count: \(error.message)")
-                        print("Session count fetch error: \(error.message)")
-                        if self?.sessionCount == 0 {
-                            // Only show a fallback message if we don't have any count yet
-                            self?.errorMessage = "Unable to connect to server. Using local count."
-                        }
+                        self?.logger.error("Failed to fetch session count: \(error.localizedDescription)")
                     }
                 },
                 receiveValue: { [weak self] count in
-                    self?.isRefreshingCount = false
                     self?.sessionCount = count
-                    print("Updated session count to: \(count)")
                     self?.logger.info("Updated session count to: \(count)")
                 }
             )
             .store(in: &cancellables)
     }
     
-    // Force refresh session count
-    func refreshSessionCount() {
-        fetchSessionCount()
-    }
-    
     // MARK: - Private Methods
     
     private func validateRecordingPrerequisites() -> Bool {
-        // Check if user is logged in
-        guard userManager.isLoggedIn else {
-            errorMessage = "Please log in before recording"
+        // Check authentication
+        guard firebaseService.isAuthenticated else {
+            errorMessage = "Please sign in before recording"
             return false
         }
         
@@ -464,261 +161,177 @@ class RecordingManager: ObservableObject {
         return true
     }
     
-    private func finishRecording(saveToBuffer: Bool = false) {
-        recordingTimer?.invalidate()
-        recordingTimer = nil
-        
-        isRecording = false
-        
-        if saveToBuffer {
-            recordingMessage = "Saving recording to local buffer..."
-            saveRecordingToBuffer()
-        } else {
-            recordingMessage = "Processing recording..."
-            sendRecordingToAPI()
-        }
-    }
-    
-    private func startNextAutoRecordingSession() {
-        guard isAutoRecording else { return }
-        
-        // Clear any existing timers
-        recordingTimer?.invalidate()
-        recordingTimer = nil
-        
-        // Start a new recording
-        isRecording = true
-        let durationInSeconds = recordingDuration * 60
-        recordingSecondsLeft = durationInSeconds
-        recordingMessage = "Auto-recording: \(formatTimeRemaining(recordingSecondsLeft))"
-        
-        // Clear previous RR intervals
-        bluetoothManager.rrIntervals = []
-        currentRRIntervals = []
-        
-        // Create recording timer
+    private func startRecordingTimer() {
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self, self.isAutoRecording else { return }
+            guard let self = self else { return }
             
-            if self.recordingSecondsLeft > 0 {
-                self.recordingSecondsLeft -= 1
-                self.recordingMessage = "Auto-recording: \(self.formatTimeRemaining(self.recordingSecondsLeft))"
+            self.recordingSecondsElapsed += 1
+            
+            // Check for connection loss
+            if self.bluetoothManager.connectionState != .connected {
+                self.handleConnectionLoss()
+                return
+            }
+            
+            // Update message and check completion
+            if self.selectedTag == .sleep {
+                // Sleep continues until manually stopped
+                self.recordingMessage = "Recording sleep: \(self.formatTime(self.recordingSecondsElapsed)) elapsed"
             } else {
-                // Capture the RR intervals and finish this recording
-                self.currentRRIntervals = self.bluetoothManager.rrIntervals
-                self.finishAutoRecordingSession()
+                // Fixed duration recordings
+                let totalSeconds = self.recordingDuration * 60
+                let remaining = totalSeconds - self.recordingSecondsElapsed
+                
+                if remaining > 0 {
+                    self.recordingMessage = "Recording: \(self.formatTime(remaining)) remaining"
+                } else {
+                    // Recording complete
+                    self.finishRecording()
+                }
             }
         }
         
-        // Ensure the timer works in background
         if let timer = recordingTimer {
             RunLoop.current.add(timer, forMode: .common)
         }
     }
     
-    private func finishAutoRecordingSession() {
-        // Clean up recording timer
+    private func handleConnectionLoss() {
         recordingTimer?.invalidate()
         recordingTimer = nil
         
         isRecording = false
+        recordingMessage = "Recording failed: Connection lost"
+        errorMessage = "Bluetooth connection lost. Recording discarded."
+        currentRRIntervals = []
         
-        // Check connection state
-        if bluetoothManager.connectionState == .connected {
-            recordingMessage = "Processing auto-recording..."
-            
-            // Send data to API
-            sendRecordingToAPI { [weak self] success in
-                guard let self = self, self.isAutoRecording else { return }
-                
-                if success {
-                    // Schedule the next recording after the interval
-                    self.scheduleNextAutoRecording()
-                } else {
-                    // If failed, save to buffer and continue
-                    self.saveRecordingToBuffer()
-                    self.scheduleNextAutoRecording()
-                }
-            }
-        } else {
-            // We're disconnected, save to buffer
-            recordingMessage = "Connection unavailable. Saving recording to buffer..."
-            saveRecordingToBuffer()
-            
-            // Try to reconnect if not already in recovery mode
-            if !isRecoveryMode {
-                isRecoveryMode = true
-                bluetoothManager.enableAutoReconnect()
-                startReconnectionTimer()
-            }
+        // End background task if active
+        if selectedTag == .sleep {
+            BackgroundTaskManager.shared.endBackgroundTask()
         }
+        
+        logger.error("Recording failed due to connection loss")
     }
     
-    private func scheduleNextAutoRecording() {
-        // Set the time until next recording (in seconds)
-        timeUntilNextRecording = intervalBetweenRecordings * 60
-        recordingMessage = "Next auto-recording in: \(formatTimeRemaining(timeUntilNextRecording))"
+    private func finishRecording() {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
         
-        // Create interval timer to countdown to next recording
-        intervalTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self, self.isAutoRecording else { return }
+        // Capture current RR intervals
+        currentRRIntervals = bluetoothManager.rrIntervals
+        
+        // Validate we have data
+        guard !currentRRIntervals.isEmpty else {
+            isRecording = false
+            recordingMessage = "Recording failed: No data collected"
+            errorMessage = "No heart rate data was collected. Please ensure the sensor is properly positioned."
+            logger.error("No RR intervals collected during recording")
             
-            if self.timeUntilNextRecording > 0 {
-                self.timeUntilNextRecording -= 1
-                self.recordingMessage = "Next auto-recording in: \(self.formatTimeRemaining(self.timeUntilNextRecording))"
-            } else {
-                // Time's up - start the next recording
-                self.intervalTimer?.invalidate()
-                self.intervalTimer = nil
-                self.startNextAutoRecordingSession()
+            // End background task if active
+            if selectedTag == .sleep {
+                BackgroundTaskManager.shared.endBackgroundTask()
             }
-        }
-        
-        // Ensure the timer works in background
-        if let timer = intervalTimer {
-            RunLoop.current.add(timer, forMode: .common)
-        }
-    }
-    
-    private func syncNextBufferedSession(index: Int) {
-        let bufferedSessions = DataBufferService.shared.fetchBufferedSessions()
-        
-        guard index < bufferedSessions.count else {
-            // No more sessions to sync
-            updateBufferedSessionCount()
+            
             return
         }
         
-        let session = bufferedSessions[index]
+        isRecording = false
+        isLoading = true
+        recordingMessage = "Processing and saving recording..."
         
-        // Check if we should retry this session
-        if !DataBufferService.shared.shouldRetrySession(at: index) {
-            logger.warning("Session \(session.recordingData.recordingSessionId) reached max retry attempts, skipping")
-            // Skip to next session
-            syncNextBufferedSession(index: index + 1)
-            return
-        }
-        
-        // Update attempt count
-        DataBufferService.shared.updateBufferedSession(at: index, withAttemptCount: session.attemptCount + 1)
-        
-        // Try to send to API
-        APIService.shared.sendHRVData(hrvData: session.recordingData)
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { [weak self] completionResult in
-                    if case .failure(let error) = completionResult {
-                        self?.logger.error("Failed to sync buffered session: \(error.message)")
-                        
-                        // Move on to the next session
-                        self?.syncNextBufferedSession(index: index + 1)
-                    }
-                },
-                receiveValue: { [weak self] response in
-                    guard let self = self else { return }
-                    
-                    if response.status == "success" {
-                        self.logger.info("Successfully synced buffered session")
-                        
-                        // Remove the successfully synced session
-                        DataBufferService.shared.removeBufferedSession(at: index)
-                        
-                        // Update session count
-                        self.fetchSessionCount()
-                        
-                        // Continue with next session (index stays the same since we removed one)
-                        self.syncNextBufferedSession(index: index)
-                    } else {
-                        self.logger.error("API returned error for buffered session: \(response.message)")
-                        
-                        // Move on to the next session
-                        self.syncNextBufferedSession(index: index + 1)
-                    }
-                }
-            )
-            .store(in: &cancellables)
+        saveRecording()
     }
     
-    private func sendRecordingToAPI(completion: ((Bool) -> Void)? = nil) {
-        // Ensure we have the necessary data
-        guard userManager.isLoggedIn,
-              !self.currentRRIntervals.isEmpty,
-              bluetoothManager.connectionState == .connected else {
-            errorMessage = "Cannot send recording: missing data"
-            completion?(false)
+    private func saveRecording() {
+        guard let user = firebaseService.currentUser,
+              let startTime = recordingStartTime else {
+            errorMessage = "Unable to save recording: User not authenticated"
+            isLoading = false
             return
         }
         
-        // Create a unique session ID with timestamp
-        let sessionId = "session_\(Int(Date().timeIntervalSince1970))"
+        let endTime = Date()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: startTime)
         
-        // Sanitize device info to prevent NUL byte issues
-        let firmwareVersion = bluetoothManager.deviceInfo.firmwareRevision.replacingOccurrences(of: "\0", with: "")
-        let modelName = bluetoothManager.deviceInfo.model.replacingOccurrences(of: "\0", with: "")
-        
-        // Create request data
-        let recordingData = HRVRecordingData(
-            user_id: userManager.email,
-            device_info: HRVRecordingData.DeviceInfo(
-                model: modelName,
-                firmwareVersion: firmwareVersion
+        // Create session data
+        let sessionId = UUID().uuidString
+        let session = HRVSession(
+            sessionId: sessionId,
+            userId: user.uid,
+            userEmail: user.email ?? "unknown",
+            date: dateString,
+            startTime: ISO8601DateFormatter().string(from: startTime),
+            endTime: ISO8601DateFormatter().string(from: endTime),
+            tag: selectedTag.rawValue,
+            pairedId: pairedSessionId,
+            deviceInfo: HRVSession.DeviceInfo(
+                model: bluetoothManager.deviceInfo.model,
+                firmwareVersion: bluetoothManager.deviceInfo.firmwareRevision
             ),
-            recordingSessionId: sessionId,
-            timestamp: ISO8601DateFormatter().string(from: Date()),
-            rrIntervals: self.currentRRIntervals,
+            rrIntervals: currentRRIntervals,
             heartRate: bluetoothManager.heartRate,
-            motionArtifacts: false,
-            tags: [selectedTag] // Single tag as per requirements
+            duration: recordingSecondsElapsed,
+            notes: nil
         )
         
-        // Add debug info
-        print("=== DEBUG INFO ===")
-        print("Device Model: \(recordingData.device_info.model ?? "Unknown")")
-        print("Firmware: \(recordingData.device_info.firmwareVersion ?? "Unknown")")
-        print("RR Intervals: \(recordingData.rrIntervals.prefix(5))... (total: \(recordingData.rrIntervals.count))")
-        print("==================")
+        // Store session ID for pairing if this is a pre-event recording
+        if selectedTag == .experimentPairedPre {
+            pairedSessionId = sessionId
+        } else if selectedTag == .experimentPairedPost {
+            // Clear paired ID after post recording
+            pairedSessionId = nil
+        }
         
-        // Log the data we're sending
-        logger.info("Sending recording data: \(sessionId)")
-        logger.info("Device: \(modelName), Firmware: \(firmwareVersion)")
-        logger.info("RR Intervals count: \(self.currentRRIntervals.count)")
+        logger.info("Saving session: \(sessionId), RR count: \(self.currentRRIntervals.count), duration: \(self.recordingSecondsElapsed)s")
         
-        // Send to API
-        APIService.shared.sendHRVData(hrvData: recordingData)
+        // Save to Firebase
+        firebaseService.saveHRVSession(session)
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { [weak self] completionResult in
-                    if case .failure(let error) = completionResult {
-                        self?.errorMessage = "API Error: \(error.message)"
-                        self?.recordingMessage = "Recording failed to send"
-                        self?.logger.error("API error: \(error.message)")
-                        completion?(false)
+                receiveCompletion: { [weak self] completion in
+                    self?.isLoading = false
+                    
+                    // End background task if active
+                    if self?.selectedTag == .sleep {
+                        BackgroundTaskManager.shared.endBackgroundTask()
+                    }
+                    
+                    if case .failure(let error) = completion {
+                        self?.errorMessage = "Failed to save recording: \(error.localizedDescription)"
+                        self?.recordingMessage = "Recording failed to save"
+                        self?.logger.error("Failed to save recording: \(error.localizedDescription)")
                     }
                 },
-                receiveValue: { [weak self] response in
-                    guard let self = self else { return }
+                receiveValue: { [weak self] sessionKey in
+                    self?.isLoading = false
+                    self?.recordingMessage = "Recording saved successfully"
+                    self?.errorMessage = nil
+                    self?.fetchSessionCount()
+                    self?.logger.info("Recording saved successfully: \(sessionKey)")
                     
-                    if response.status == "success" {
-                        self.recordingMessage = "Recording saved successfully"
-                        // Get latest count after successful submission
-                        self.fetchSessionCount()
-                        self.errorMessage = nil
-                        self.logger.info("Recording saved successfully")
-                        completion?(true)
-                    } else {
-                        self.errorMessage = "API returned error: \(response.message)"
-                        self.recordingMessage = "Recording failed"
-                        self.logger.error("API returned error: \(response.message)")
-                        completion?(false)
+                    // Clear the message after 3 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        self?.recordingMessage = ""
                     }
                 }
             )
             .store(in: &cancellables)
     }
     
-    private func formatTimeRemaining(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let remainingSeconds = seconds % 60
-        return String(format: "%d:%02d", minutes, remainingSeconds)
+    private func formatTime(_ seconds: Int) -> String {
+        if seconds < 3600 {
+            // Less than an hour: MM:SS
+            let minutes = seconds / 60
+            let remainingSeconds = seconds % 60
+            return String(format: "%d:%02d", minutes, remainingSeconds)
+        } else {
+            // More than an hour: HH:MM:SS
+            let hours = seconds / 3600
+            let minutes = (seconds % 3600) / 60
+            let remainingSeconds = seconds % 60
+            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
+        }
     }
 }
