@@ -54,9 +54,8 @@ Each recording session is tagged with physiological context information to enabl
 | Tag | Description | Physiological State |
 |-----|-------------|---------------------|
 | **Sleep** | Nocturnal rest periods | Parasympathetic dominance, used for baseline establishment |
-| **Rest** | Awake but passive (reading, watching) | Moderate parasympathetic activity |
-| **Active** | Light physical activity (walking, cleaning) | Balanced autonomic activity |
-| **Engaged** | Cognitive or physical effort (work, exercise) | Sympathetic dominance |
+| **Wake Check** | HRV check in after waking up. Constructing recovery baseline (Moderate parasympathetic activity)
+| **Pre Sleep** | HRV check in before sleep. | Constructing dayload baseline |
 | **Experiment** | Custom interventions | User-defined protocols for personal exploration |
 
 The tagging system is crucial because HRV metrics must be interpreted differently based on physiological context—what's "good" during sleep may be concerning during exercise, and vice versa.
