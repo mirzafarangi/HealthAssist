@@ -663,3 +663,21 @@ The API is built with Python using FastAPI framework and SQLAlchemy ORM:
 <summary><h2>Contact</h2></summary>
 Created by - Atriom Circle, Applied Intelligence Practice - For questions or support, please contact: [a.beheshti@posteo.de]
 </details>
+
+## Screenshots
+
+![Screenshot 0](screenshots/0.png)
+![Screenshot 1](screenshots/1.png)
+![Screenshot 2](screenshots/2.png)
+![Screenshot 3](screenshots/3.png)
+![Screenshot 4](screenshots/4.png)
+![Screenshot 5](screenshots/5.png)
+![Screenshot 6](screenshots/6.png)
+![Screenshot IMG_5636](screenshots/IMG_5636.PNG)
+![Screenshot IMG_5637](screenshots/IMG_5637.PNG)
+![Screenshot IMG_5638](screenshots/IMG_5638.jpg)
+![Screenshot IMG_5639](screenshots/IMG_5639.PNG)
+![Screenshot IMG_5641](screenshots/IMG_5641.PNG)
+![Screenshot IMG_5642](screenshots/IMG_5642.PNG)
+![Screenshot IMG_5643](screenshots/IMG_5643.PNG)
+![Screenshot IMG_5644](screenshots/IMG_5644.PNG)
