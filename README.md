@@ -1,4 +1,4 @@
-# HRV Metrics Analysis Platform
+# Lumenis: Health Assist Platform
 
 ## Project Overview
 
