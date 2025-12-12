@@ -54,7 +54,7 @@ Each recording session is tagged with physiological context information to enabl
 | Tag | Description | Physiological State |
 |-----|-------------|---------------------|
 | **Sleep** | Nocturnal rest periods | Parasympathetic dominance, used for baseline establishment |
-| **Wake Check** | HRV check in after waking up. Constructing recovery baseline (Moderate parasympathetic activity)
+| **Wake Check** | HRV check in after waking up. | Constructing recovery baseline (Moderate parasympathetic activity)
 | **Pre Sleep** | HRV check in before sleep. | Constructing dayload baseline |
 | **Experiment** | Custom interventions | User-defined protocols for personal exploration |
 
