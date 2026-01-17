@@ -85,3 +85,6 @@ Implemented new frequency domain analysis for autonomic nervous system assessmen
 ### 2026-01-16 - Enhance HRV analytics with advanced cardiovascular metrics
 Implemented new frequency domain analysis for autonomic nervous system assessment. Integrated Polar H10 data processing improvements.
 
+### 2026-01-17 - Improve iOS app stability for continuous heart rate monitoring
+Resolved memory management issues in background monitoring. Enhanced Bluetooth connectivity with Polar H10 device.
+
