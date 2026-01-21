@@ -97,3 +97,6 @@ Improved data pipeline efficiency for live HRV calculations. Reduced latency in 
 ### 2026-01-21 - Improve iOS app stability for continuous heart rate monitoring
 Resolved memory management issues in background monitoring. Enhanced Bluetooth connectivity with Polar H10 device.
 
+### 2026-01-21 - Improve iOS app stability for continuous heart rate monitoring
+Resolved memory management issues in background monitoring. Enhanced Bluetooth connectivity with Polar H10 device.
+
